@@ -27,7 +27,7 @@ def arg_parse():
         elif re.match(r'--source=.*', arg):
             source_file = arg.split('=')[1]
         elif arg == "--help":
-            print("\nUsage: python interpret.py [--help] [--source=source_file / --input=input_file]")
+            print("\nUsage: python interpret_bad.py [--help] [--source=source_file / --input=input_file]")
             print("--source=source_file - path to XML source file")
             print("--input=input_file - path to file with user inputs (can be empty)")
             print("--help - print this help")
