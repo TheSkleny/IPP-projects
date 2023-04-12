@@ -49,8 +49,9 @@ class Interpret:
         pass
 
     @staticmethod
-    def stderr_print(message):
+    def stderr_print(message, exit_code):
         sys.stderr.write(message + "\n")
+        exit(exit_code)
 
     def do_magic(self):
         self.arg_parse()
@@ -65,16 +66,14 @@ class Interpret:
             try:
                 self.tree = ET.parse(self.source_file, ET.XMLParser(encoding="utf-8"))
             except Exception:
-                self.stderr_print("ERR: XML file has invalid format")
-                exit(31)
+                self.stderr_print("ERR: XML file has invalid format", 31)
         if self.input_file == "":
             self.input_file = sys.stdin
         else:
             try:
                 self.input_file = open(self.input_file, "r")
             except FileNotFoundError:
-                self.stderr_print("ERR: Nonexistent input file")
-                exit(31)
+                self.stderr_print("ERR: Nonexistent input file", 31)
 
     def arg_parse(self):
         for arg in sys.argv[1:]:
@@ -91,266 +90,203 @@ class Interpret:
                     "At least one of the --source or --input arguments must be present, missing one is read from stdin.")
                 exit(0)
             else:
-                self.stderr_print("ERR: Invalid arguments")
-                exit(10)
+                self.stderr_print("ERR: Invalid arguments", 10)
         if self.input_file == "" and self.source_file == "":
-            self.stderr_print("ERR: Missing arguments")
-            exit(10)
+            self.stderr_print("ERR: Missing arguments", 10)
 
     def check_xml(self):
         order = 0
         self.root = self.tree.getroot()
         try:
             self.root[:] = sorted(self.root, key=lambda inst: (inst.tag, int(inst.attrib['order'])))
-            if self.root.tag != "program":
-                self.stderr_print("ERR: Invalid XML, root tag is not program")
-                exit(31)
-            for key in self.root.attrib.keys():
-                if key != "language" and key != "name" and key != "description":
-                    self.stderr_print("ERR: Invalid XML, root attributes are not valid")
-                    exit(32)
-            if self.root.attrib["language"].lower() != "ippcode23":
-                self.stderr_print("ERR: Invalid XML, language is not IPPcode23")
-                exit(32)
-            for child in self.root:
-                child[:] = sorted(child, key=lambda argument: argument.tag)
-                if child.tag != "instruction":
-                    self.stderr_print("ERR: Invalid XML, child tag is not instruction")
-                    exit(32)
-                for key in child.attrib.keys():
-                    if key != "opcode" and key != "order":
-                        self.stderr_print("ERR: Invalid XML, attributes of instruction are not valid")
-                        exit(32)
-                if child.attrib["order"] == "":
-                    self.stderr_print("ERR: Invalid XML, order is empty")
-                    exit(31)
-                if int(child.attrib["order"]) > order:
-                    order = int(child.attrib["order"])
-                else:
-                    self.stderr_print("ERR: Invalid XML, instructions are not in ascending order")
-                    exit(32)
-                if child.attrib["opcode"] == "":
-                    self.stderr_print("ERR: Invalid XML, opcode is empty")
-                    exit(31)
-                if child.attrib["opcode"].upper() not in self.INSTRUCTIONS:
-                    self.stderr_print("ERR: Invalid XML, opcode is not valid")
-                    exit(32)
-                for arg in child:
-                    if arg.tag != "arg1" and arg.tag != "arg2" and arg.tag != "arg3":
-                        self.stderr_print("ERR: Invalid XML, arg tag is not valid")
-                        exit(32)
-                    if arg.attrib["type"] == "":
-                        self.stderr_print("ERR: Invalid XML, arg type is empty")
-                        exit(31)
-                    if arg.attrib["type"] not in ["var", "label", "type", "int", "string", "bool", "nil"]:
-                        self.stderr_print("ERR: Invalid XML, arg type is not valid")
-                        exit(32)
-                    if arg.attrib["type"] == "var":
-                        if not re.match(r"^(GF|LF|TF)@[a-zA-Z_$&%*!?-][a-zA-Z0-9_$&%*!?-]*$", arg.text):
-                            self.stderr_print("ERR: Invalid XML, var is not valid")
-                            exit(32)
-                    if arg.attrib["type"] == "label":
-                        if not re.match(r'^[a-zA-Z_$&%*!?-][a-zA-Z0-9_$&%*!?-]*$', arg.text):
-                            self.stderr_print("ERR: Invalid XML, label is not valid")
-                            exit(32)
-                    if arg.attrib["type"] == "type":
-                        if arg.text not in ["int", "string", "bool"]:
-                            self.stderr_print("ERR: Invalid XML, type is not valid")
-                            exit(32)
-                    if arg.attrib["type"] == "int":
-                        if not re.match(r'^[-+]?[0-9]+$', arg.text):
-                            self.stderr_print("ERR: Invalid XML, int is not valid")
-                            exit(32)
-                    if arg.attrib["type"] == "string":
-                        if not re.match(r'^[^\s#\\\\]|(\\[0-9]{3})*$', "" if arg.text is None else arg.text):
-                            self.stderr_print("ERR: Invalid XML, string is not valid")
-                            exit(32)
-                    if arg.attrib["type"] == "bool":
-                        if arg.text != "true" or arg.text != "false":
-                            self.stderr_print("ERR: Invalid XML, bool is not valid")
-                            exit(32)
-                    if arg.attrib["type"] == "nil":
-                        if arg.text != "nil":
-                            self.stderr_print("ERR: Invalid XML, nil is not valid")
-                            exit(32)
         except Exception:
-            self.stderr_print("ERR: Invalid XML")
-            exit(31)
+            self.stderr_print("ERR: Invalid XML, sorting of instructions failed", 32)
+        if self.root.tag != "program":
+            self.stderr_print("ERR: Invalid XML, root tag is not program", 32)
+        language_here = False
+        for key in self.root.attrib.keys():
+            if key != "language" and key != "name" and key != "description":
+                self.stderr_print("ERR: Invalid XML, root attributes are not valid", 32)
+            if key == "language":
+                language_here = True
+        if language_here is False:
+            self.stderr_print("ERR: Invalid XML, root attributes are not valid", 32)
+        if self.root.attrib["language"].lower() != "ippcode23":
+            self.stderr_print("ERR: Invalid XML, language is not IPPcode23", 32)
+        for child in self.root:
+            child[:] = sorted(child, key=lambda argument: argument.tag)
+            if child.tag != "instruction":
+                self.stderr_print("ERR: Invalid XML, child tag is not instruction", 32)
+            opcode_here = False
+            order_here = False
+            for key in child.attrib.keys():
+                if key != "opcode" and key != "order":
+                    self.stderr_print("ERR: Invalid XML, attributes of instruction are not valid", 32)
+                if key == "opcode":
+                    opcode_here = True
+                if key == "order":
+                    order_here = True
+            if opcode_here is False or order_here is False:
+                self.stderr_print("ERR: Invalid XML, attributes of instruction are not valid", 32)
+            if child.attrib["order"] == "":
+                self.stderr_print("ERR: Invalid XML, order is empty", 32)
+            if int(child.attrib["order"]) > order:
+                order = int(child.attrib["order"])
+            else:
+                self.stderr_print("ERR: Invalid XML, instructions are not in ascending order", 32)
+            if child.attrib["opcode"].upper() not in self.INSTRUCTIONS:
+                self.stderr_print("ERR: Invalid XML, opcode is not valid", 32)
+            for arg in child:
+                if arg.tag != "arg1" and arg.tag != "arg2" and arg.tag != "arg3":
+                    self.stderr_print("ERR: Invalid XML, arg tag is not valid", 32)
+                if arg.attrib["type"] == "":
+                    self.stderr_print("ERR: Invalid XML, arg type is empty", 31)
+                if arg.attrib["type"] not in ["var", "label", "type", "int", "string", "bool", "nil"]:
+                    self.stderr_print("ERR: Invalid XML, arg type is not valid", 32)
+                if arg.attrib["type"] == "var":
+                    if not re.match(r"^(GF|LF|TF)@[a-zA-Z_$&%*!?-][a-zA-Z0-9_$&%*!?-]*$", arg.text):
+                        self.stderr_print("ERR: Invalid XML, var is not valid", 32)
+                if arg.attrib["type"] == "label":
+                    if not re.match(r'^[a-zA-Z_$&%*!?-][a-zA-Z0-9_$&%*!?-]*$', arg.text):
+                        self.stderr_print("ERR: Invalid XML, label is not valid", 32)
+                if arg.attrib["type"] == "type":
+                    if arg.text not in ["int", "string", "bool"]:
+                        self.stderr_print("ERR: Invalid XML, type is not valid", 32)
+                if arg.attrib["type"] == "int":
+                    if not re.match(r'^[-+]?[0-9]+$', arg.text):
+                        self.stderr_print("ERR: Invalid XML, int is not valid", 32)
+                if arg.attrib["type"] == "string":
+                    if not re.match(r'^[^\s#\\\\]|(\\[0-9]{3})*$', "" if arg.text is None else arg.text):
+                        self.stderr_print("ERR: Invalid XML, string is not valid", 32)
+                if arg.attrib["type"] == "bool":
+                    if arg.text != "true" or arg.text != "false":
+                        self.stderr_print("ERR: Invalid XML, bool is not valid", 32)
+                if arg.attrib["type"] == "nil":
+                    if arg.text != "nil":
+                        self.stderr_print("ERR: Invalid XML, nil is not valid", 32)
 
     def check_instruction_args(self, instruction):
         if instruction.opcode in ["MOVE", "TYPE"]:
             if len(instruction.args) != 2:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
             if instruction.args[0].typ != "var":
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
             if instruction.args[1].typ not in ["var", "int", "string", "bool", "nil"]:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
         elif instruction.opcode in ["CREATEFRAME", "PUSHFRAME", "POPFRAME", "RETURN", "BREAK"]:
             if len(instruction.args) != 0:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments")
-                exit(32)
-        elif instruction.opcode not in ["DEFVAR", "POPS"]:
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
+        elif instruction.opcode in ["DEFVAR", "POPS"]:
             if len(instruction.args) != 1:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
             if instruction.args[0].typ != "var":
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
         elif instruction.opcode in ["CALL", "LABEL", "JUMP"]:
             if len(instruction.args) != 1:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
             if instruction.args[0].typ != "label":
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type")
-                exit(32)
-        elif instruction.opcode not in ["PUSHS", "WRITE", "DPRINT"]:
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
+        elif instruction.opcode in ["PUSHS", "WRITE", "DPRINT"]:
             if len(instruction.args) != 1:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
             if instruction.args[0].typ not in ["var", "int", "string", "bool", "nil"]:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
         elif instruction.opcode == "EXIT":
             if len(instruction.args) != 1:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
             if instruction.args[0].typ != "int":
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
         elif instruction.opcode in ["ADD", "SUB", "MUL", "IDIV"]:
             if len(instruction.args) != 3:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
             if instruction.args[0].typ != "var":
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
             if instruction.args[1].typ not in ["var", "int"]:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
             if instruction.args[2].typ not in ["var", "int"]:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
         elif instruction.opcode in ["LT", "GT", "EQ"]:
             if len(instruction.args) != 3:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
             if instruction.args[0].typ != "var":
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
             if instruction.args[1].typ not in ["var", "int", "string", "bool"]:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
             if instruction.args[2].typ not in ["var", "int", "string", "bool"]:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
         elif instruction.opcode in ["AND", "OR"]:
             if len(instruction.args) != 3:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
             if instruction.args[0].typ != "var":
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
             if instruction.args[1].typ not in ["var", "bool"]:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
             if instruction.args[2].typ not in ["var", "bool"]:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
         elif instruction.opcode == "NOT":
             if len(instruction.args) != 2:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
             if instruction.args[0].typ != "var":
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
             if instruction.args[1].typ not in ["var", "bool"]:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
         elif instruction.opcode == "INT2CHAR":
             if len(instruction.args) != 2:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
             if instruction.args[0].typ != "var":
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
             if instruction.args[1].typ not in ["var", "int"]:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
         elif instruction.opcode in ["STRI2INT", "GETCHAR"]:
             if len(instruction.args) != 3:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
             if instruction.args[0].typ != "var":
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
             if instruction.args[1].typ not in ["var", "string"]:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
             if instruction.args[2].typ not in ["var", "int"]:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
         elif instruction.opcode == "STRLEN":
             if len(instruction.args) != 2:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
             if instruction.args[0].typ != "var":
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
             if instruction.args[1].typ not in ["var", "string"]:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
         elif instruction.opcode == "READ":
             if len(instruction.args) != 2:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
             if instruction.args[0].typ != "var":
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
             if instruction.args[1].typ != "type":
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type")
-                exit(32)
-        elif instruction.type == "SETCHAR":
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
+        elif instruction.opcode == "SETCHAR":
             if len(instruction.args) != 3:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
             if instruction.args[0].typ != "var":
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
             if instruction.args[1].typ not in ["var", "int"]:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
             if instruction.args[2].typ not in ["var", "string"]:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
         elif instruction.opcode in ["JUMPIFEQ", "JUMPIFNEQ"]:
             if len(instruction.args) != 3:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
             if instruction.args[0].typ != "label":
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
             if instruction.args[1].typ not in ["var", "int", "string", "bool", "nil"]:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
             if instruction.args[2].typ not in ["var", "int", "string", "bool", "nil"]:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
         elif instruction.opcode == "CONCAT":
             if len(instruction.args) != 3:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
             if instruction.args[0].typ != "var":
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
             if instruction.args[1].typ not in ["var", "string"]:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
             if instruction.args[2].typ not in ["var", "string"]:
-                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type")
-                exit(32)
+                self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
 
     def parse_xml(self):
         for child in self.root:
@@ -372,4 +308,5 @@ class Interpret:
 if __name__ == "__main__":
     interpret = Interpret()
     interpret.do_magic()
-    interpret.print_instructions()
+    # interpret.print_instructions()
+    exit(0)
