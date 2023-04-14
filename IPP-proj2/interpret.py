@@ -1,6 +1,7 @@
 import re
 import sys
 import xml.etree.ElementTree as ET
+import fileinput
 
 
 def stderr_print(message, exit_code):
@@ -85,7 +86,7 @@ class Stack:
 
 
 class ExecuteProgram:
-    def __init__(self, instructions):
+    def __init__(self, instructions, input_file):
         self.instructions = instructions
         self.instruction_index = 0
         self.instruction = None
@@ -95,6 +96,7 @@ class ExecuteProgram:
         self._labels = {}
         self._frames_stack = Stack()
         self._data_stack = Stack()
+        self._input_file = input_file
 
     @staticmethod
     def _translate_string(string):
@@ -276,7 +278,37 @@ class ExecuteProgram:
         raise NotImplementedError
 
     def read(self, instruction):
-        raise NotImplementedError
+        var = self._get_var(instruction.get_arg(0).get_data())
+        type_ = instruction.get_arg(1).get_data()
+        inp = input() if self._input_file == "" else self._input_file.readline()
+        if type_ == "int":
+            try:
+                var.set_value(int(inp.strip()))
+                var.set_type("int")
+            except ValueError:
+                var.set_type("nil")
+                var.set_value("nil@nil")
+        elif type_ == "bool":
+            try:
+                if inp.strip() == "":
+                    var.set_type("nil")
+                    var.set_value("nil@nil")
+                else:
+                    var.set_value("true" if inp.strip() == "true" else "false")
+                    var.set_type("bool")
+            except ValueError:
+                var.set_type("nil")
+                var.set_value("nil@nil")
+        elif type_ == "string":
+            try:
+                var.set_value(inp.strip())
+                var.set_type("string")
+            except ValueError:
+                var.set_type("nil")
+                var.set_value("nil@nil")
+        else:
+            var.set_type("nil")
+            var.set_value("nil@nil")
 
     def write(self, instruction):
         if instruction.get_arg(0).get_type() == "bool":
@@ -358,7 +390,7 @@ class Interpret:
         self.read_files()
         self.check_xml()
         self.parse_xml()
-        execute = ExecuteProgram(self.instruction_list)
+        execute = ExecuteProgram(self.instruction_list, self.input_file)
         execute.execute()
 
     def read_files(self):
@@ -369,9 +401,7 @@ class Interpret:
                 self.tree = ET.parse(self.source_file, ET.XMLParser(encoding="utf-8"))
             except Exception:
                 stderr_print("ERR: XML file has invalid format", 31)
-        if self.input_file == "":
-            self.input_file = sys.stdin
-        else:
+        if self.input_file != "":
             try:
                 self.input_file = open(self.input_file, "r")
             except FileNotFoundError:
@@ -561,7 +591,7 @@ class Interpret:
             if instruction.args[0].typ != "var":
                 stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
             if instruction.args[1].typ != "type":
-                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
+                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32) # TODO: check if return codes are valid
         elif instruction.opcode == "SETCHAR":
             if len(instruction.args) != 3:
                 stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
