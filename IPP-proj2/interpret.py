@@ -52,6 +52,15 @@ class Variable:
     def get_name(self):
         return self.name
 
+    def set_value(self, value):
+        self.value = value
+
+    def set_type(self, typ):
+        self.type = typ
+
+    def set_name(self, name):
+        self.name = name
+
 
 class Frame:
     def __init__(self):
@@ -81,11 +90,15 @@ class ExecuteProgram:
         self.instruction_index = 0
         self.instruction = None
         self._GF_frame = Frame()
-        self._LF_frame = None  # definuje se az kdyz se ma stvorit
-        self._TF_frame = None  # definuje se az kdyz se ma stvorit
+        self._LF_frame = None  # it is defined only when it is needed
+        self._TF_frame = None  # it is defined only when it is created or poped
         self._labels = {}
         self._frames_stack = Stack()
         self._data_stack = Stack()
+
+    @staticmethod
+    def _translate_string(string):
+        return re.sub(r"\\([0-9]{3})", lambda x: chr(int(x.group(1))), string)
         
     def _get_var(self, name):
         if name[0] == "G":
@@ -107,193 +120,218 @@ class ExecuteProgram:
         for instr in self.instructions:
             match instr.opcode:
                 case "MOVE":
-                    self.move()
+                    self.move(instr)
                 case "CREATEFRAME":
-                    self.create_frame()
+                    self.create_frame(instr)
                 case "PUSHFRAME":
-                    self.push_frame()
+                    self.push_frame(instr)
                 case "POPFRAME":
-                    self.pop_frame()
+                    self.pop_frame(instr)
                 case "DEFVAR":
-                    self.def_var()
+                    self.def_var(instr)
                 case "CALL":
-                    self.call()
+                    self.call(instr)
                 case "RETURN":
-                    self.return_()
+                    self.return_(instr)
                 case "PUSHS":
-                    self.pushs()
+                    self.pushs(instr)
                 case "POPS":
-                    self.pops()
+                    self.pops(instr)
                 case "ADD":
-                    self.add()
+                    self.add(instr)
                 case "SUB":
-                    self.sub()
+                    self.sub(instr)
                 case "MUL":
-                    self.mul()
+                    self.mul(instr)
                 case "IDIV":
-                    self.idiv()
+                    self.idiv(instr)
                 case "LT":
-                    self.lt()
+                    self.lt(instr)
                 case "GT":
-                    self.gt()
+                    self.gt(instr)
                 case "EQ":
-                    self.eq()
+                    self.eq(instr)
                 case "AND":
-                    self.and_()
+                    self.and_(instr)
                 case "OR":
-                    self.or_()
+                    self.or_(instr)
                 case "NOT":
-                    self.not_()
+                    self.not_(instr)
                 case "INT2CHAR":
-                    self.int2char()
+                    self.int2char(instr)
                 case "STRI2INT":
-                    self.stri2int()
+                    self.stri2int(instr)
                 case "READ":
-                    self.read()
+                    self.read(instr)
                 case "WRITE":
                     self.write(instr)
                 case "CONCAT":
-                    self.concat()
+                    self.concat(instr)
                 case "STRLEN":
-                    self.strlen()
+                    self.strlen(instr)
                 case "GETCHAR":
-                    self.getchar()
+                    self.getchar(instr)
                 case "SETCHAR":
-                    self.setchar()
+                    self.setchar(instr)
                 case "TYPE":
-                    self.type_()
+                    self.type_(instr)
                 case "LABEL":
-                    self.label()
+                    self.label(instr)
                 case "JUMP":
-                    self.jump()
+                    self.jump(instr)
                 case "JUMPIFEQ":
-                    self.jumpifeq()
+                    self.jumpifeq(instr)
                 case "JUMPIFNEQ":
-                    self.jumpifneq()
+                    self.jumpifneq(instr)
                 case "EXIT":
-                    self.exit()
+                    self.exit(instr)
                 case "DPRINT":
-                    self.dprint()
+                    self.dprint(instr)
                 case "BREAK":
-                    self.break_()
+                    self.break_(instr)
                 case _:  # default
                     stderr_print("ERR: Invalid instruction", 32)
 
-    def move(self):
+    def move(self, instruction):
+        var = self._get_var(instruction.get_arg(0).get_data())
+        if instruction.get_arg(1).get_type() == "var":
+            var.set_value(self._get_var(instruction.get_arg(1).get_data()).get_value())
+            var.set_type(self._get_var(instruction.get_arg(1).get_data()).get_type())
+        else:
+            var.set_value(instruction.get_arg(1).get_data())
+            var.set_type(instruction.get_arg(1).get_type())
+
+    def create_frame(self, instruction):
         raise NotImplementedError
 
-    def create_frame(self):
+    def push_frame(self, instruction):
         raise NotImplementedError
 
-    def push_frame(self):
+    def pop_frame(self, instruction):
         raise NotImplementedError
 
-    def pop_frame(self):
+    def def_var(self, instruction):
+        var = instruction.get_arg(0).get_data()
+        if var[0] == "G":
+            self._GF_frame.add_variable(Variable(var, None, None))
+        elif var[0] == "L":
+            try:
+                self._LF_frame.add_variable(Variable(var, None, None))
+            except AttributeError:
+                stderr_print("ERR: Local frame not defined", 55)
+        elif var[0] == "T":
+            try:
+                self._TF_frame.add_variable(Variable(var, None, None))
+            except AttributeError:
+                stderr_print("ERR: Temporary frame not defined", 55)
+        else:
+            stderr_print("ERR: Invalid variable name", 32)
+
+    def call(self, instruction):
         raise NotImplementedError
 
-    def def_var(self):
+    def return_(self, instruction):
         raise NotImplementedError
 
-    def call(self):
+    def pushs(self, instruction):
         raise NotImplementedError
 
-    def return_(self):
+    def pops(self, instruction):
         raise NotImplementedError
 
-    def pushs(self):
+    def add(self, instruction):
         raise NotImplementedError
 
-    def pops(self):
+    def sub(self, instruction):
         raise NotImplementedError
 
-    def add(self):
+    def mul(self, instruction):
         raise NotImplementedError
 
-    def sub(self):
+    def idiv(self, instruction):
         raise NotImplementedError
 
-    def mul(self):
+    def lt(self, instruction):
         raise NotImplementedError
 
-    def idiv(self):
+    def gt(self, instruction):
         raise NotImplementedError
 
-    def lt(self):
+    def eq(self, instruction):
         raise NotImplementedError
 
-    def gt(self):
+    def and_(self, instruction):
         raise NotImplementedError
 
-    def eq(self):
+    def or_(self, instruction):
         raise NotImplementedError
 
-    def and_(self):
+    def not_(self, instruction):
         raise NotImplementedError
 
-    def or_(self):
+    def int2char(self, instruction):
         raise NotImplementedError
 
-    def not_(self):
+    def stri2int(self, instruction):
         raise NotImplementedError
 
-    def int2char(self):
-        raise NotImplementedError
-
-    def stri2int(self):
-        raise NotImplementedError
-
-    def read(self):
+    def read(self, instruction):
         raise NotImplementedError
 
     def write(self, instruction):
         if instruction.get_arg(0).get_type() == "bool":
-            print("true" if instruction.get_arg(0).data == "true" else "false", end="")
+            print("true" if instruction.get_arg(0).get_data() == "true" else "false", end="")
         elif instruction.get_arg(0).get_type() == "nil":
             print("", end="")
         elif instruction.get_arg(0).get_type() == "var":
-            var = self._get_var(instruction.get_arg(0).data)
+            var = self._get_var(instruction.get_arg(0).get_data())
             if var.get_type() == "bool":
                 print("true" if var.get_value() == "true" else "false", end="")
+            elif instruction.get_arg(0).get_type() == "string":
+                print(self._translate_string(var.get_value()), end="")
             elif var.get_type() == "nil":
                 print("", end="")
             else:
                 print(var.get_value(), end="")
+        elif instruction.get_arg(0).get_type() == "string":
+            print(self._translate_string(instruction.get_arg(0).get_data()), end="")
         else:
-            print(instruction.get_arg(0).data, end="")
-    def concat(self):
+            print(instruction.get_arg(0).get_data(), end="")
+
+    def concat(self, instruction):
         raise NotImplementedError
 
-    def strlen(self):
+    def strlen(self, instruction):
         raise NotImplementedError
 
-    def getchar(self):
+    def getchar(self, instruction):
         raise NotImplementedError
 
-    def setchar(self):
+    def setchar(self, instruction):
         raise NotImplementedError
 
-    def type_(self):
+    def type_(self, instruction):
         raise NotImplementedError
 
-    def label(self):
+    def label(self, instruction):
         raise NotImplementedError
 
-    def jump(self):
+    def jump(self, instruction):
         raise NotImplementedError
 
-    def jumpifeq(self):
+    def jumpifeq(self, instruction):
         raise NotImplementedError
 
-    def jumpifneq(self):
+    def jumpifneq(self, instruction):
         raise NotImplementedError
 
-    def exit(self):
+    def exit(self, instruction):
         raise NotImplementedError
 
-    def dprint(self):
+    def dprint(self, instruction):
         raise NotImplementedError
 
-    def break_(self):
+    def break_(self, instruction):
         raise NotImplementedError
 
 
@@ -322,6 +360,7 @@ class Interpret:
         self.parse_xml()
         execute = ExecuteProgram(self.instruction_list)
         execute.execute()
+
     def read_files(self):
         if self.source_file == "":
             self.tree = ET.parse(sys.stdin, ET.XMLParser(encoding="utf-8"))
