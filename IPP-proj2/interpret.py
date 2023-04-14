@@ -12,6 +12,12 @@ class Instruction:
     def add_arg(self, arg):
         self.args.append(arg)
 
+    def get_arg(self, index):
+        return self.args[index]
+
+    def get_args(self):
+        return self.args
+
 
 class Argument:
     def __init__(self, typ, data):
@@ -293,6 +299,8 @@ class Interpret:
             instruction = Instruction(child.attrib["opcode"].upper(), child.attrib["order"])
             for arg in child:
                 instruction.add_arg(Argument(arg.attrib["type"], arg.text))
+                if int(arg.tag[3:]) > len(instruction.get_args()):
+                    self.stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
             self.check_instruction_args(instruction)
             self.instruction_list.append(instruction)
 
@@ -303,10 +311,8 @@ class Interpret:
                 print("\t" + arg.typ, arg.data)
 
 
-
-
 if __name__ == "__main__":
     interpret = Interpret()
     interpret.do_magic()
-    # interpret.print_instructions()
+    interpret.print_instructions()
     exit(0)
