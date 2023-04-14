@@ -4,6 +4,12 @@ import xml.etree.ElementTree as ET
 
 
 class Instruction:
+    _GF_variables = {}
+    _LF_variables = {}
+    _TF_variables = {}
+    _labels = {}
+    _stack = []
+
     def __init__(self, opcode, order):
         self.opcode = opcode
         self.order = order
@@ -17,6 +23,191 @@ class Instruction:
 
     def get_args(self):
         return self.args
+
+    @staticmethod
+    def stderr_print(message, exit_code):
+        sys.stderr.write(message + "\n")
+        exit(exit_code)
+
+    def execute(self):
+        match self.opcode:
+            case "MOVE":
+                self.move()
+            case "CREATEFRAME":
+                self.create_frame()
+            case "PUSHFRAME":
+                self.push_frame()
+            case "POPFRAME":
+                self.pop_frame()
+            case "DEFVAR":
+                self.def_var()
+            case "CALL":
+                self.call()
+            case "RETURN":
+                self.return_()
+            case "PUSHS":
+                self.pushs()
+            case "POPS":
+                self.pops()
+            case "ADD":
+                self.add()
+            case "SUB":
+                self.sub()
+            case "MUL":
+                self.mul()
+            case "IDIV":
+                self.idiv()
+            case "LT":
+                self.lt()
+            case "GT":
+                self.gt()
+            case "EQ":
+                self.eq()
+            case "AND":
+                self.and_()
+            case "OR":
+                self.or_()
+            case "NOT":
+                self.not_()
+            case "INT2CHAR":
+                self.int2char()
+            case "STRI2INT":
+                self.stri2int()
+            case "READ":
+                self.read()
+            case "WRITE":
+                self.write()
+            case "CONCAT":
+                self.concat()
+            case "STRLEN":
+                self.strlen()
+            case "GETCHAR":
+                self.getchar()
+            case "SETCHAR":
+                self.setchar()
+            case "TYPE":
+                self.type_()
+            case "LABEL":
+                self.label()
+            case "JUMP":
+                self.jump()
+            case "JUMPIFEQ":
+                self.jumpifeq()
+            case "JUMPIFNEQ":
+                self.jumpifneq()
+            case "EXIT":
+                self.exit()
+            case "DPRINT":
+                self.dprint()
+            case "BREAK":
+                self.break_()
+            case _:  # default
+                self.stderr_print("ERR: Invalid instruction", 32)
+
+    def move(self):
+        raise NotImplementedError
+
+    def create_frame(self):
+        raise NotImplementedError
+
+    def push_frame(self):
+        raise NotImplementedError
+
+    def pop_frame(self):
+        raise NotImplementedError
+
+    def def_var(self):
+        raise NotImplementedError
+
+    def call(self):
+        raise NotImplementedError
+
+    def return_(self):
+        raise NotImplementedError
+
+    def pushs(self):
+        raise NotImplementedError
+
+    def pops(self):
+        raise NotImplementedError
+
+    def add(self):
+        raise NotImplementedError
+
+    def sub(self):
+        raise NotImplementedError
+
+    def mul(self):
+        raise NotImplementedError
+
+    def idiv(self):
+        raise NotImplementedError
+
+    def lt(self):
+        raise NotImplementedError
+
+    def gt(self):
+        raise NotImplementedError
+
+    def eq(self):
+        raise NotImplementedError
+
+    def and_(self):
+        raise NotImplementedError
+
+    def or_(self):
+        raise NotImplementedError
+
+    def not_(self):
+        raise NotImplementedError
+
+    def int2char(self):
+        raise NotImplementedError
+
+    def stri2int(self):
+        raise NotImplementedError
+
+    def read(self):
+        raise NotImplementedError
+
+    def write(self):
+        raise NotImplementedError
+
+    def concat(self):
+        raise NotImplementedError
+
+    def strlen(self):
+        raise NotImplementedError
+
+    def getchar(self):
+        raise NotImplementedError
+
+    def setchar(self):
+        raise NotImplementedError
+
+    def type_(self):
+        raise NotImplementedError
+
+    def label(self):
+        raise NotImplementedError
+
+    def jump(self):
+        raise NotImplementedError
+
+    def jumpifeq(self):
+        raise NotImplementedError
+
+    def jumpifneq(self):
+        raise NotImplementedError
+
+    def exit(self):
+        raise NotImplementedError
+
+    def dprint(self):
+        raise NotImplementedError
+
+    def break_(self):
+        raise NotImplementedError
 
 
 class Argument:
@@ -35,6 +226,9 @@ class Variable:
 class Frame:
     pass
 
+
+class Stack:
+    pass
 
 class Interpret:
     def __init__(self):
