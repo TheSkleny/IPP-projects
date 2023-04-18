@@ -1,13 +1,29 @@
+"""
+    @file interpret.py
+    @brief Implementation of interpret module
+
+    @author  David Sklenář - xsklen14
+    @date 18.4.2023
+"""
+
+
 import re
 import sys
 import xml.etree.ElementTree as ET
 
 
+# Function for printing error message to stderr and exiting with error code
+# @param message - string to print
+# @param exit_code - error code to exit with
 def stderr_print(message, exit_code):
     sys.stderr.write(message + "\n")
     exit(exit_code)
 
 
+# Class to represent Instruction
+# @param opcode - string containing opcode
+# @param order - int containing order of instruction in source code
+# @param args - list of Argument objects
 class Instruction:
 
     def __init__(self, opcode, order):
@@ -15,30 +31,42 @@ class Instruction:
         self.order = order
         self.args = []
 
+    # @brief - add argument to instruction
+    # @param arg - Argument object
     def add_arg(self, arg):
         self.args.append(arg)
 
+    # @brief - get argument at index
+    # @param index - int containing index of argument
     def get_arg(self, index):
         return self.args[index]
 
+    # @brief - get all arguments
     def get_args(self):
         return self.args
 
+    # @brief - get opcode
     def get_opcode(self):
         return self.opcode
 
 
+# Class to represent Argument
+# @param typ - string containing type of argument
+# @param data - string containing data of argument
 class Argument:
     def __init__(self, typ, data):
         self.typ = typ
         self.data = data
-        
+
+    # @brief - get type of argument
     def get_type(self):
         return self.typ
-    
+
+    # @brief - get data of argument
     def get_data(self):
         return self.data
 
+    # @brief - convert data to correct type
     def convert_data(self):
         if self.typ == "int":
             self.data = int(self.data)
@@ -58,72 +86,111 @@ class Argument:
             stderr_print("ERR: Invalid argument type", 32)
 
 
+# Class to represent Variable
+# @param name - string containing name of variable
+# @param typ - string containing type of variable
+# @param value - string containing value of variable
 class Variable:
     def __init__(self, name, typ, value):
         self.name = name  # contains also frame
         self.type = typ
         self.value = value
 
+    # @brief - get value of variable
     def get_value(self):
         return self.value
 
+    # @brief - get type of variable
     def get_type(self):
         return self.type
 
+    # @brief - get name of variable
     def get_name(self):
         return self.name
 
+    # @brief - set value of variable
+    # @param value - string containing value
     def set_value(self, value):
         self.value = value
 
+    # @brief - set type of variable
+    # @param typ - string containing type
     def set_type(self, typ):
         self.type = typ
 
+    # @brief - set name of variable
+    # @param name - string containing name
     def set_name(self, name):
         self.name = name
 
 
+# Class to represent Frame
+# @summary - contains dictionary of variables
 class Frame:
     def __init__(self):
         self.variables = {}
 
+    # @brief - add variable to frame
+    # @param variable - Variable object
     def add_variable(self, variable):  # variable is Variable object, name is string in format GF@var
         self.variables[variable.get_name()] = variable
 
+    # @brief - get variable from frame
+    # @param name - string containing name of variable
     def get_variable(self, name):  # returns Variable object
         try:
             return self.variables[name]
         except KeyError:
             return None
 
+    # @brief - get all variables from frame
     def get_variables(self):
         return self.variables
 
 
+# Class to represent Stack
+# @summary - contains list of objects
 class Stack:
     def __init__(self):
         self.stack = []
 
+    # @brief - add item to stack
+    # @param item - object to add
     def push(self, item):
         self.stack.append(item)
 
+    # @brief - remove item from stack
     def pop(self):
         try:
             return self.stack.pop()
         except IndexError:
             return None
 
+    # @brief - get item from top of stack
     def top(self):
         try:
             return self.stack[-1]
         except IndexError:
             return None
 
+    # @brief - check if stack is empty
     def is_empty(self):
         return not self.stack
 
 
-
+# Class to represent XML interpreter
+# @param instructions - list of Instruction objects
+# @param input_file - file object containing input for read instructions
+# instruction_pointer - int containing index of current instruction
+# instruction - Instruction object containing current instruction
+# _GF_frame - Frame object containing global frame
+# _TF_frame - Frame object containing temporary frame
+# _labels - dictionary containing labels and their indexes
+# _frames_stack - Stack object containing local frames
+# _data_stack - Stack object containing data
+# _call_stack - Stack object containing indexes of instructions
+# _input_file - file object containing input for read instructions
+# @summary - handles execution of instructions
 class ExecuteProgram:
     def __init__(self, instructions, input_file):
         self.instructions = instructions
@@ -137,6 +204,7 @@ class ExecuteProgram:
         self._call_stack = Stack()
         self._input_file = input_file
 
+    # @brief - insert labels into dictionary, so they can be used as jump targets
     def match_labels(self):
         for i, instruction in enumerate(self.instructions):
             if instruction.opcode == "LABEL":
@@ -144,10 +212,14 @@ class ExecuteProgram:
                     stderr_print("ERR: Label already defined", 52)
                 self._labels[instruction.get_arg(0).get_data()] = i
 
+    # @brief - transform string to correct format
+    # @param string - string to transform
     @staticmethod
     def _translate_string(string):
         return re.sub(r"\\([0-9]{3})", lambda x: chr(int(x.group(1))), string)
-        
+
+    # @brief - get variable from frame
+    # @param name - string containing name of variable
     def _get_var(self, name):
         if name[0] == "G":
             return self._GF_frame.get_variable(name)
@@ -170,6 +242,9 @@ class ExecuteProgram:
         else:
             stderr_print("ERR: Invalid variable name", 32)
 
+    # @brief - arithmetic operations
+    # @param instruction - Instruction object
+    # @param operation - string containing operation
     def _arithmetic(self, instruction, operation):
         var_save = self._get_var(instruction.get_arg(0).get_data())
         if instruction.get_arg(1).get_type() == "var":
@@ -195,6 +270,9 @@ class ExecuteProgram:
         else:
             stderr_print("ERR: Arithmetic operation with non-integers", 53)
 
+    # @brief - logical operations
+    # @param instruction - Instruction object
+    # @param operation - string containing operation
     def _and_or(self, instruction, operation):
         var_save = self._get_var(instruction.get_arg(0).get_data())
         if instruction.get_arg(1).get_type() == "var":
@@ -216,6 +294,9 @@ class ExecuteProgram:
         else:
             stderr_print("ERR: Invalid types for AND/OR", 53)
 
+    # @brief - compare operations
+    # @param instruction - Instruction object
+    # @param operation - string containing operation
     def _compare(self, instruction, operation):
         var_save = self._get_var(instruction.get_arg(0).get_data())
         if instruction.get_arg(1).get_type() == "var":
@@ -248,7 +329,8 @@ class ExecuteProgram:
                 stderr_print("ERR: Invalid types for compare", 53)
         else:
             stderr_print("ERR: Invalid types for compare", 53)
-    
+
+    # @brief - "switch" for instructions
     def execute(self):
         while self.instruction_pointer < len(self.instructions):
             instr = self.instructions[self.instruction_pointer]
@@ -325,6 +407,8 @@ class ExecuteProgram:
             else:  # default
                 stderr_print("ERR: Invalid instruction", 32)
             self.instruction_pointer += 1
+
+    # -------------------------INSTRUCTIONS-------------------------
 
     def move(self, instruction):
         var = self._get_var(instruction.get_arg(0).get_data())
@@ -681,6 +765,8 @@ class ExecuteProgram:
         raise NotImplementedError
 
 
+# Class representing Interpret
+# It is responsible for parsing arguments, reading files, parsing XML and interpreting
 class Interpret:
     def __init__(self):
         self.input_file = ""
@@ -697,8 +783,9 @@ class Interpret:
                              "LABEL", "JUMP", "JUMPIFEQ", "JUMPIFNEQ",
                              "EXIT", "DPRINT", "BREAK")
         self.instruction_list = []
-        pass
 
+    # Main method of Interpret class
+    # It is responsible for calling all other functions
     def do_magic(self):
         self.arg_parse()
         self.read_files()
@@ -708,6 +795,7 @@ class Interpret:
         execute.match_labels()
         execute.execute()
 
+    # Method for setting correct input and source files
     def read_files(self):
         if self.source_file == "":
             self.tree = ET.parse(sys.stdin, ET.XMLParser(encoding="utf-8"))
@@ -722,6 +810,7 @@ class Interpret:
             except FileNotFoundError:
                 stderr_print("ERR: Nonexistent input file", 31)
 
+    # Method for argument parsing
     def arg_parse(self):
         for arg in sys.argv[1:]:
             if re.match(r'--input=.*', arg):
@@ -741,6 +830,7 @@ class Interpret:
         if self.input_file == "" and self.source_file == "":
             stderr_print("ERR: Missing arguments", 10)
 
+    # Check if XML is valid, mostly job that should be done by parser.php, but just to be sure
     def check_xml(self):
         order = 0
         self.root = self.tree.getroot()
@@ -819,6 +909,7 @@ class Interpret:
                     if arg.text != "nil":
                         stderr_print("ERR: Invalid XML, nil is not valid", 32)
 
+    # Check if instruction arguments are valid - if not return error 53 or 32
     @staticmethod
     def check_instruction_args(instruction):
         if instruction.opcode in ["MOVE", "TYPE"]:
@@ -943,6 +1034,7 @@ class Interpret:
             if instruction.args[2].typ not in ["var", "string"]:
                 stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32)
 
+    # parses valid XML file into Instruction objects
     def parse_xml(self):
         for child in self.root:
             instruction = Instruction(child.attrib["opcode"].upper(), int(child.attrib["order"]))
