@@ -464,16 +464,70 @@ class ExecuteProgram:
             print(instruction.get_arg(0).get_data(), end="")
 
     def concat(self, instruction):
-        raise NotImplementedError
+        var_set = self._get_var(instruction.get_arg(0).get_data())
+        if instruction.get_arg(1).get_type() == "var":
+            var1 = self._get_var(instruction.get_arg(1).get_data())
+        else:
+            var1 = Variable("tmp", instruction.get_arg(1).get_type(), instruction.get_arg(1).get_data())
+        if instruction.get_arg(2).get_type() == "var":
+            var2 = self._get_var(instruction.get_arg(2).get_data())
+        else:
+            var2 = Variable("tmp", instruction.get_arg(2).get_type(), instruction.get_arg(2).get_data())
+        if var1.get_type() == "string" and var2.get_type() == "string":
+            var_set.set_value(var1.get_value() + var2.get_value())
+            var_set.set_type("string")
+        else:
+            stderr_print("ERR: Invalid type of variable", 53)
 
     def strlen(self, instruction):
-        raise NotImplementedError
+        var_set = self._get_var(instruction.get_arg(0).get_data())
+        if instruction.get_arg(1).get_type() == "var":
+            var = self._get_var(instruction.get_arg(1).get_data())
+        else:
+            var = Variable("tmp", instruction.get_arg(1).get_type(), instruction.get_arg(1).get_data())
+        if var.get_type() == "string":
+            var_set.set_value(len(var.get_value()))
+            var_set.set_type("int")
+        else:
+            stderr_print("ERR: Invalid type of variable", 53)
 
     def getchar(self, instruction):
-        raise NotImplementedError
+        var_set = self._get_var(instruction.get_arg(0).get_data())
+        if instruction.get_arg(1).get_type() == "var":
+            var1 = self._get_var(instruction.get_arg(1).get_data())
+        else:
+            var1 = Variable("tmp", instruction.get_arg(1).get_type(), instruction.get_arg(1).get_data())
+        if instruction.get_arg(2).get_type() == "var":
+            var2 = self._get_var(instruction.get_arg(2).get_data())
+        else:
+            var2 = Variable("tmp", instruction.get_arg(2).get_type(), instruction.get_arg(2).get_data())
+        if var1.get_type() == "string" and var2.get_type() == "int":
+            try:
+                var_set.set_value(var1.get_value()[var2.get_value()])
+                var_set.set_type("string")
+            except IndexError:
+                stderr_print("ERR: Index out of range", 58)
+        else:
+            stderr_print("ERR: Invalid type of variable", 53)
+
 
     def setchar(self, instruction):
-        raise NotImplementedError
+        var_set = self._get_var(instruction.get_arg(0).get_data())
+        if instruction.get_arg(1).get_type() == "var":
+            var1 = self._get_var(instruction.get_arg(1).get_data())
+        else:
+            var1 = Variable("tmp", instruction.get_arg(1).get_type(), instruction.get_arg(1).get_data())
+        if instruction.get_arg(2).get_type() == "var":
+            var2 = self._get_var(instruction.get_arg(2).get_data())
+        else:
+            var2 = Variable("tmp", instruction.get_arg(2).get_type(), instruction.get_arg(2).get_data())
+        if var_set.get_type() == "string" and var1.get_type() == "int" and var2.get_type() == "string":
+            if var1.get_value() < len(var_set.get_value()):
+                var_set.set_value(var_set.get_value()[:var1.get_value()] + var2.get_value()[0] + var_set.get_value()[var1.get_value() + 1:])
+            else:
+                stderr_print("ERR: Index out of range", 58)
+        else:
+            stderr_print("ERR: Invalid type of variable", 53)
 
     def type_(self, instruction):
         var_set = self._get_var(instruction.get_arg(0).get_data())
@@ -497,9 +551,15 @@ class ExecuteProgram:
         raise NotImplementedError
 
     def exit(self, instruction):
-        var = self._get_var(instruction.get_arg(0).get_data())
+        if instruction.get_arg(0).get_type() == "var":
+            var = self._get_var(instruction.get_arg(0).get_data())
+        else:
+            var = Variable("tmp", instruction.get_arg(0).get_type(), instruction.get_arg(0).get_data())
         if var.get_type() == "int":
-            exit(var.get_value())
+            if 0 <= var.get_value() <= 49:
+                sys.exit(var.get_value())
+            else:
+                stderr_print(f"ERR: Cannot exit with {var.get_value()} value", 57)
         else:
             stderr_print("ERR: Invalid type of variable", 53)
 
@@ -680,7 +740,7 @@ class Interpret:
             if len(instruction.args) != 1:
                 stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
             if instruction.args[0].typ != "int":
-                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32)
+                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
         elif instruction.opcode in ["ADD", "SUB", "MUL", "IDIV"]:
             if len(instruction.args) != 3:
                 stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
@@ -751,9 +811,9 @@ class Interpret:
             if instruction.args[0].typ != "var":
                 stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32)
             if instruction.args[1].typ not in ["var", "int"]:
-                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32)
+                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
             if instruction.args[2].typ not in ["var", "string"]:
-                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32)
+                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
         elif instruction.opcode in ["JUMPIFEQ", "JUMPIFNEQ"]:
             if len(instruction.args) != 3:
                 stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
