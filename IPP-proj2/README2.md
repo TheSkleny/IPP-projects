@@ -218,4 +218,4 @@ __Methods:__
 
 ## UML diagram
 
-![UML diagram](interpret.png)
+![UML diagram](pictures/interpret.png)
