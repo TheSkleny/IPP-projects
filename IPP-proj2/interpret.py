@@ -24,6 +24,9 @@ class Instruction:
     def get_args(self):
         return self.args
 
+    def get_opcode(self):
+        return self.opcode
+
 
 class Argument:
     def __init__(self, typ, data):
@@ -120,6 +123,7 @@ class Stack:
         return not self.stack
 
 
+
 class ExecuteProgram:
     def __init__(self, instructions, input_file):
         self.instructions = instructions
@@ -177,17 +181,16 @@ class ExecuteProgram:
         else:
             var2 = Variable("temp2", instruction.get_arg(2).get_type(), instruction.get_arg(2).get_data())
         if var1.get_type() == "int" and var2.get_type() == "int":
-            match operation:
-                case "add":
-                    var_save.set_value(int(var1.get_value()) + int(var2.get_value()))
-                case "sub":
-                    var_save.set_value(int(var1.get_value()) - int(var2.get_value()))
-                case "mul":
-                    var_save.set_value(int(var1.get_value()) * int(var2.get_value()))
-                case "idiv":
-                    if int(var2.get_value()) == 0:
-                        stderr_print("ERR: Division by zero", 57)
-                    var_save.set_value(int(var1.get_value()) // int(var2.get_value()))
+            if operation == "add":
+                var_save.set_value(int(var1.get_value()) + int(var2.get_value()))
+            elif operation == "sub":
+                var_save.set_value(int(var1.get_value()) - int(var2.get_value()))
+            elif operation == "mul":
+                var_save.set_value(int(var1.get_value()) * int(var2.get_value()))
+            elif operation == "idiv":
+                if int(var2.get_value()) == 0:
+                    stderr_print("ERR: Division by zero", 57)
+                var_save.set_value(int(var1.get_value()) // int(var2.get_value()))
             var_save.set_type("int")
         else:
             stderr_print("ERR: Arithmetic operation with non-integers", 53)
@@ -249,79 +252,78 @@ class ExecuteProgram:
     def execute(self):
         while self.instruction_pointer < len(self.instructions):
             instr = self.instructions[self.instruction_pointer]
-            match instr.opcode:
-                case "MOVE":
-                    self.move(instr)
-                case "CREATEFRAME":
-                    self.create_frame()
-                case "PUSHFRAME":
-                    self.push_frame()
-                case "POPFRAME":
-                    self.pop_frame()
-                case "DEFVAR":
-                    self.def_var(instr)
-                case "CALL":
-                    self.call(instr)
-                case "RETURN":
-                    self.return_()
-                case "PUSHS":
-                    self.pushs(instr)
-                case "POPS":
-                    self.pops(instr)
-                case "ADD":
-                    self.add(instr)
-                case "SUB":
-                    self.sub(instr)
-                case "MUL":
-                    self.mul(instr)
-                case "IDIV":
-                    self.idiv(instr)
-                case "LT":
-                    self.lt(instr)
-                case "GT":
-                    self.gt(instr)
-                case "EQ":
-                    self.eq(instr)
-                case "AND":
-                    self.and_(instr)
-                case "OR":
-                    self.or_(instr)
-                case "NOT":
-                    self.not_(instr)
-                case "INT2CHAR":
-                    self.int2char(instr)
-                case "STRI2INT":
-                    self.stri2int(instr)
-                case "READ":
-                    self.read(instr)
-                case "WRITE":
-                    self.write(instr)
-                case "CONCAT":
-                    self.concat(instr)
-                case "STRLEN":
-                    self.strlen(instr)
-                case "GETCHAR":
-                    self.getchar(instr)
-                case "SETCHAR":
-                    self.setchar(instr)
-                case "TYPE":
-                    self.type_(instr)
-                case "LABEL":
-                    self.label(instr)
-                case "JUMP":
-                    self.jump(instr)
-                case "JUMPIFEQ":
-                    self.jumpifeq(instr)
-                case "JUMPIFNEQ":
-                    self.jumpifneq(instr)
-                case "EXIT":
-                    self.exit(instr)
-                case "DPRINT":
-                    self.dprint(instr)
-                case "BREAK":
-                    self.break_(instr)
-                case _:  # default
-                    stderr_print("ERR: Invalid instruction", 32)
+            if instr.get_opcode() == "MOVE":
+                self.move(instr)
+            elif instr.get_opcode() == "CREATEFRAME":
+                self.create_frame()
+            elif instr.get_opcode() == "PUSHFRAME":
+                self.push_frame()
+            elif instr.get_opcode() == "POPFRAME":
+                self.pop_frame()
+            elif instr.get_opcode() == "DEFVAR":
+                self.def_var(instr)
+            elif instr.get_opcode() == "CALL":
+                self.call(instr)
+            elif instr.get_opcode() == "RETURN":
+                self.return_()
+            elif instr.get_opcode() == "PUSHS":
+                self.pushs(instr)
+            elif instr.get_opcode() == "POPS":
+                self.pops(instr)
+            elif instr.get_opcode() == "ADD":
+                self.add(instr)
+            elif instr.get_opcode() == "SUB":
+                self.sub(instr)
+            elif instr.get_opcode() == "MUL":
+                self.mul(instr)
+            elif instr.get_opcode() == "IDIV":
+                self.idiv(instr)
+            elif instr.get_opcode() == "LT":
+                self.lt(instr)
+            elif instr.get_opcode() == "GT":
+                self.gt(instr)
+            elif instr.get_opcode() == "EQ":
+                self.eq(instr)
+            elif instr.get_opcode() == "AND":
+                self.and_(instr)
+            elif instr.get_opcode() == "OR":
+                self.or_(instr)
+            elif instr.get_opcode() == "NOT":
+                self.not_(instr)
+            elif instr.get_opcode() == "INT2CHAR":
+                self.int2char(instr)
+            elif instr.get_opcode() == "STRI2INT":
+                self.stri2int(instr)
+            elif instr.get_opcode() == "READ":
+                self.read(instr)
+            elif instr.get_opcode() == "WRITE":
+                self.write(instr)
+            elif instr.get_opcode() == "CONCAT":
+                self.concat(instr)
+            elif instr.get_opcode() == "STRLEN":
+                self.strlen(instr)
+            elif instr.get_opcode() == "GETCHAR":
+                self.getchar(instr)
+            elif instr.get_opcode() == "SETCHAR":
+                self.setchar(instr)
+            elif instr.get_opcode() == "TYPE":
+                self.type_(instr)
+            elif instr.get_opcode() == "LABEL":
+                self.label(instr)
+            elif instr.get_opcode() == "JUMP":
+                self.jump(instr)
+            elif instr.get_opcode() == "JUMPIFEQ":
+                self.jumpifeq(instr)
+            elif instr.get_opcode() == "JUMPIFNEQ":
+                self.jumpifneq(instr)
+            elif instr.get_opcode() == "EXIT":
+                self.exit(instr)
+            elif instr.get_opcode() == "DPRINT":
+                self.dprint(instr)
+            elif instr.get_opcode() == "BREAK":
+                self.break_(instr)
+            else:  # default
+                stderr_print("ERR: Invalid instruction", 32)
             self.instruction_pointer += 1
 
     def move(self, instruction):
@@ -365,7 +367,7 @@ class ExecuteProgram:
             if self._GF_frame.get_variable(var) is None:
                 self._GF_frame.add_variable(Variable(var, None, None))
             else:
-                stderr_print("ERR: Variable already definedin GF", 52)
+                stderr_print("ERR: Variable already defined in GF", 52)
         elif var[0] == "L":
             try:
                 if self._frames_stack.is_empty():
@@ -953,7 +955,7 @@ class Interpret:
             self.check_instruction_args(instruction)
             self.instruction_list.append(instruction)
 
-    def print_instructions(self): # for debugging TODO: remove
+    def print_instructions(self): # for debugging
         for instruction in self.instruction_list:
             print(instruction.order, instruction.opcode)
             for arg in instruction.args:
@@ -963,5 +965,4 @@ class Interpret:
 if __name__ == "__main__":
     interpret = Interpret()
     interpret.do_magic()
-    # interpret.print_instructions()
     exit(0)
