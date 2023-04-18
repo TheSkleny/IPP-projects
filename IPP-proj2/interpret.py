@@ -37,6 +37,22 @@ class Argument:
     def get_data(self):
         return self.data
 
+    def convert_data(self):
+        if self.typ == "int":
+            self.data = int(self.data)
+        elif self.typ == "bool":
+            self.data = True if self.data == "true" else False
+        elif self.typ == "string":
+            self.data = str(self.data)
+        elif self.typ == "nil":
+            self.data = "nil"
+        elif self.typ == "type":
+            self.data = self.data
+        elif self.typ == "var":
+            self.data = self.data
+        else:
+            stderr_print("ERR: Invalid argument type", 32)
+
 
 class Variable:
     def __init__(self, name, typ, value):
@@ -117,6 +133,86 @@ class ExecuteProgram:
                 stderr_print("ERR: Temporary frame not defined", 55)
         else:
             stderr_print("ERR: Invalid variable name", 32)
+
+    def _arithmetic(self, instruction, operation):
+        var_save = self._get_var(instruction.get_arg(0).get_data())
+        if instruction.get_arg(1).get_type() == "var":
+            var1 = self._get_var(instruction.get_arg(1).get_data())
+        else:
+            var1 = Variable("temp", instruction.get_arg(1).get_type(), instruction.get_arg(1).get_data())
+        if instruction.get_arg(2).get_type() == "var":
+            var2 = self._get_var(instruction.get_arg(2).get_data())
+        else:
+            var2 = Variable("temp2", instruction.get_arg(2).get_type(), instruction.get_arg(2).get_data())
+        if var1.get_type() == "int" and var2.get_type() == "int":
+            match operation:
+                case "add":
+                    var_save.set_value(int(var1.get_value()) + int(var2.get_value()))
+                case "sub":
+                    var_save.set_value(int(var1.get_value()) - int(var2.get_value()))
+                case "mul":
+                    var_save.set_value(int(var1.get_value()) * int(var2.get_value()))
+                case "idiv":
+                    if int(var2.get_value()) == 0:
+                        stderr_print("ERR: Division by zero", 57)
+                    var_save.set_value(int(var1.get_value()) // int(var2.get_value()))
+            var_save.set_type("int")
+        else:
+            stderr_print("ERR: Arithmetic operation with non-integers", 53)
+
+    def _and_or(self, instruction, operation):
+        var_save = self._get_var(instruction.get_arg(0).get_data())
+        if instruction.get_arg(1).get_type() == "var":
+            var1 = self._get_var(instruction.get_arg(1).get_data())
+        else:
+            var1 = Variable("temp", instruction.get_arg(1).get_type(), instruction.get_arg(1).get_data())
+        if instruction.get_arg(2).get_type() == "var":
+            var2 = self._get_var(instruction.get_arg(2).get_data())
+        else:
+            var2 = Variable("temp", instruction.get_arg(2).get_type(), instruction.get_arg(2).get_data())
+        if var1.get_type() == "bool" and var2.get_type() == "bool":
+            var_save.set_type("bool")
+            if operation == "and":
+                var_save.set_value(True if var1.get_value() is True and var2.get_value() is True else False)
+            elif operation == "or":
+                var_save.set_value(True if var1.get_value() is True or var2.get_value() is True else False)
+            else: # should not happen
+                stderr_print("ERR: Invalid operation for AND/OR", 32)
+        else:
+            stderr_print("ERR: Invalid types for AND/OR", 53)
+
+    def _compare(self, instruction, operation):
+        var_save = self._get_var(instruction.get_arg(0).get_data())
+        if instruction.get_arg(1).get_type() == "var":
+            var1 = self._get_var(instruction.get_arg(1).get_data())
+        else:
+            var1 = Variable("temp", instruction.get_arg(1).get_type(), instruction.get_arg(1).get_data())
+        if instruction.get_arg(2).get_type() == "var":
+            var2 = self._get_var(instruction.get_arg(2).get_data())
+        else:
+            var2 = Variable("temp", instruction.get_arg(2).get_type(), instruction.get_arg(2).get_data())
+        if var1.get_type() == var2.get_type():
+            var_save.set_type("bool")
+            if operation == "eq":
+                var_save.set_value(True if var1.get_value() == var2.get_value() else False)
+            elif operation == "lt":
+                if var1.get_type() == "nil" or var2.get_type() == "nil":
+                    stderr_print("ERR: Invalid types for compare", 53)
+                var_save.set_value(True if var1.get_value() < var2.get_value() else False)
+            elif operation == "gt":
+                if var1.get_type() == "nil" or var2.get_type() == "nil":
+                    stderr_print("ERR: Invalid types for compare", 53)
+                var_save.set_value(True if var1.get_value() > var2.get_value() else False)
+            else: # should not happen
+                stderr_print("ERR: Invalid operation for compare", 32)
+        elif var1.get_type() == "nil" or var2.get_type() == "nil":
+            var_save.set_type("bool")
+            if operation == "eq":
+                var_save.set_value(True if var1.get_type() == var2.get_type() else False)
+            else:
+                stderr_print("ERR: Invalid types for compare", 53)
+        else:
+            stderr_print("ERR: Invalid types for compare", 53)
     
     def execute(self):
         for instr in self.instructions:
@@ -242,40 +338,77 @@ class ExecuteProgram:
         raise NotImplementedError
 
     def add(self, instruction):
-        raise NotImplementedError
+        self._arithmetic(instruction, "add")
 
     def sub(self, instruction):
-        raise NotImplementedError
+        self._arithmetic(instruction, "sub")
 
     def mul(self, instruction):
-        raise NotImplementedError
+        self._arithmetic(instruction, "mul")
 
     def idiv(self, instruction):
-        raise NotImplementedError
+        self._arithmetic(instruction, "idiv")
 
     def lt(self, instruction):
-        raise NotImplementedError
+        self._compare(instruction, "lt")
 
     def gt(self, instruction):
-        raise NotImplementedError
+        self._compare(instruction, "gt")
 
     def eq(self, instruction):
-        raise NotImplementedError
+        self._compare(instruction, "eq")
 
     def and_(self, instruction):
-        raise NotImplementedError
+        self._and_or(instruction, "and")
 
     def or_(self, instruction):
-        raise NotImplementedError
+        self._and_or(instruction, "or")
 
     def not_(self, instruction):
-        raise NotImplementedError
+        var_set = self._get_var(instruction.get_arg(0).get_data())
+        if instruction.get_arg(1).get_type() == "var":
+            var = self._get_var(instruction.get_arg(1).get_data())
+        else:
+            var = Variable("tmp", instruction.get_arg(1).get_type(), instruction.get_arg(1).get_data())
+        if var.get_type() == "bool":
+            var_set.set_value(not var.get_value())
+            var_set.set_type("bool")
+        else:
+            stderr_print("ERR: Invalid type of variable", 53)
 
     def int2char(self, instruction):
-        raise NotImplementedError
+        var_set = self._get_var(instruction.get_arg(0).get_data())
+        if instruction.get_arg(1).get_type() == "var":
+            var = self._get_var(instruction.get_arg(1).get_data())
+        else:
+            var = Variable("tmp", instruction.get_arg(1).get_type(), instruction.get_arg(1).get_data())
+        if var.get_type() == "int":
+            try:
+                var_set.set_value(chr(var.get_value()))
+                var_set.set_type("string")
+            except ValueError:
+                stderr_print("ERR: Invalid value of variable", 58)
+        else:
+            stderr_print("ERR: Invalid type of variable", 53)
 
     def stri2int(self, instruction):
-        raise NotImplementedError
+        var_set = self._get_var(instruction.get_arg(0).get_data())
+        if instruction.get_arg(1).get_type() == "var":
+            var1 = self._get_var(instruction.get_arg(1).get_data())
+        else:
+            var1 = Variable("tmp", instruction.get_arg(1).get_type(), instruction.get_arg(1).get_data())
+        if instruction.get_arg(2).get_type() == "var":
+            var2 = self._get_var(instruction.get_arg(2).get_data())
+        else:
+            var2 = Variable("tmp", instruction.get_arg(2).get_type(), instruction.get_arg(2).get_data())
+        if var1.get_type() == "string" and var2.get_type() == "int":
+            try:
+                var_set.set_value(ord(var1.get_value()[var2.get_value()]))
+                var_set.set_type("int")
+            except IndexError:
+                stderr_print("ERR: Invalid value of variable", 58)
+        else:
+            stderr_print("ERR: Invalid type of variable", 53)
 
     def read(self, instruction):
         var = self._get_var(instruction.get_arg(0).get_data())
@@ -294,7 +427,7 @@ class ExecuteProgram:
                     var.set_type("nil")
                     var.set_value("nil@nil")
                 else:
-                    var.set_value("true" if inp.strip() == "true" else "false")
+                    var.set_value(True if inp.strip() == "true" else False)
                     var.set_type("bool")
             except ValueError:
                 var.set_type("nil")
@@ -312,14 +445,14 @@ class ExecuteProgram:
 
     def write(self, instruction):
         if instruction.get_arg(0).get_type() == "bool":
-            print("true" if instruction.get_arg(0).get_data() == "true" else "false", end="")
+            print("true" if instruction.get_arg(0).get_data() is True else "false", end="")
         elif instruction.get_arg(0).get_type() == "nil":
             print("", end="")
         elif instruction.get_arg(0).get_type() == "var":
             var = self._get_var(instruction.get_arg(0).get_data())
             if var.get_type() == "bool":
-                print("true" if var.get_value() == "true" else "false", end="")
-            elif instruction.get_arg(0).get_type() == "string":
+                print("true" if var.get_value() is True else "false", end="")
+            elif var.get_type() == "string":
                 print(self._translate_string(var.get_value()), end="")
             elif var.get_type() == "nil":
                 print("", end="")
@@ -343,7 +476,13 @@ class ExecuteProgram:
         raise NotImplementedError
 
     def type_(self, instruction):
-        raise NotImplementedError
+        var_set = self._get_var(instruction.get_arg(0).get_data())
+        if instruction.get_arg(1).get_type() == "var":
+            var = self._get_var(instruction.get_arg(1).get_data())
+        else:
+            var = Variable("tmp", instruction.get_arg(1).get_type(), instruction.get_arg(1).get_data())
+        var_set.set_value(var.get_type() if var.get_type() is not None else "")
+        var_set.set_type("string")
 
     def label(self, instruction):
         raise NotImplementedError
@@ -358,10 +497,17 @@ class ExecuteProgram:
         raise NotImplementedError
 
     def exit(self, instruction):
-        raise NotImplementedError
+        var = self._get_var(instruction.get_arg(0).get_data())
+        if var.get_type() == "int":
+            exit(var.get_value())
+        else:
+            stderr_print("ERR: Invalid type of variable", 53)
 
     def dprint(self, instruction):
-        raise NotImplementedError
+        if instruction.get_arg(0).get_type() == "var":
+            sys.stderr.write(self._get_var(instruction.get_arg(0).get_data()).get_value())
+        else:
+            sys.stderr.write(instruction.get_arg(0).get_data())
 
     def break_(self, instruction):
         raise NotImplementedError
@@ -452,8 +598,6 @@ class Interpret:
             opcode_here = False
             order_here = False
             for key in child.attrib.keys():
-                if key != "opcode" and key != "order":
-                    stderr_print("ERR: Invalid XML, attributes of instruction are not valid", 32)
                 if key == "opcode":
                     opcode_here = True
                 if key == "order":
@@ -462,22 +606,31 @@ class Interpret:
                 stderr_print("ERR: Invalid XML, attributes of instruction are not valid", 32)
             if child.attrib["order"] == "":
                 stderr_print("ERR: Invalid XML, order is empty", 32)
-            if int(child.attrib["order"]) > order:
-                order = int(child.attrib["order"])
-            else:
-                stderr_print("ERR: Invalid XML, instructions are not in ascending order", 32)
+            try:
+                if int(child.attrib["order"]) > order:
+                    order = int(child.attrib["order"])
+                else:
+                    stderr_print("ERR: Invalid XML, instructions are not in ascending order", 32)
+            except Exception:
+                stderr_print("ERR: Invalid XML, order is not integer", 32)
             if child.attrib["opcode"].upper() not in self.INSTRUCTIONS:
                 stderr_print("ERR: Invalid XML, opcode is not valid", 32)
             for arg in child:
                 if arg.tag != "arg1" and arg.tag != "arg2" and arg.tag != "arg3":
                     stderr_print("ERR: Invalid XML, arg tag is not valid", 32)
+                type_here = False
+                for key in arg.attrib.keys():
+                    if key == "type":
+                        type_here = True
+                if type_here is False:
+                    stderr_print("ERR: Invalid XML, arg attributes are not valid", 32)
                 if arg.attrib["type"] == "":
                     stderr_print("ERR: Invalid XML, arg type is empty", 31)
                 if arg.attrib["type"] not in ["var", "label", "type", "int", "string", "bool", "nil"]:
                     stderr_print("ERR: Invalid XML, arg type is not valid", 32)
                 if arg.attrib["type"] == "var":
-                    if not re.match(r"^(GF|LF|TF)@[a-zA-Z_$&%*!?-][a-zA-Z0-9_$&%*!?-]*$", arg.text):
-                        stderr_print("ERR: Invalid XML, var is not valid", 32)
+                    if not re.match(r"^(GF|LF|TF)@[a-zA-Z_$&%*!?-][a-zA-Z0-9_$&%*!?-]*$", str(arg.text).strip()):
+                        stderr_print("ERR: Invalid XML, var is not valid", 52)
                 if arg.attrib["type"] == "label":
                     if not re.match(r'^[a-zA-Z_$&%*!?-][a-zA-Z0-9_$&%*!?-]*$', arg.text):
                         stderr_print("ERR: Invalid XML, label is not valid", 32)
@@ -485,13 +638,13 @@ class Interpret:
                     if arg.text not in ["int", "string", "bool"]:
                         stderr_print("ERR: Invalid XML, type is not valid", 32)
                 if arg.attrib["type"] == "int":
-                    if not re.match(r'^[-+]?[0-9]+$', arg.text):
+                    if not re.match(r'^[-+]?[0-9]+$', str(arg.text).strip()):
                         stderr_print("ERR: Invalid XML, int is not valid", 32)
                 if arg.attrib["type"] == "string":
-                    if not re.match(r'^[^\s#\\\\]|(\\[0-9]{3})*$', "" if arg.text is None else arg.text):
+                    if not re.match(r'^[^\s#\\\\]|(\\[0-9]{3})*$', "" if arg.text is None else str(arg.text).strip()):
                         stderr_print("ERR: Invalid XML, string is not valid", 32)
                 if arg.attrib["type"] == "bool":
-                    if arg.text != "true" or arg.text != "false":
+                    if str(arg.text).strip() != "true" and str(arg.text).strip() != "false":
                         stderr_print("ERR: Invalid XML, bool is not valid", 32)
                 if arg.attrib["type"] == "nil":
                     if arg.text != "nil":
@@ -502,9 +655,9 @@ class Interpret:
             if len(instruction.args) != 2:
                 stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
             if instruction.args[0].typ != "var":
-                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
+                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32)
             if instruction.args[1].typ not in ["var", "int", "string", "bool", "nil"]:
-                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
+                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32)
         elif instruction.opcode in ["CREATEFRAME", "PUSHFRAME", "POPFRAME", "RETURN", "BREAK"]:
             if len(instruction.args) != 0:
                 stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
@@ -512,27 +665,27 @@ class Interpret:
             if len(instruction.args) != 1:
                 stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
             if instruction.args[0].typ != "var":
-                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
+                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32)
         elif instruction.opcode in ["CALL", "LABEL", "JUMP"]:
             if len(instruction.args) != 1:
                 stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
             if instruction.args[0].typ != "label":
-                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
+                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32)
         elif instruction.opcode in ["PUSHS", "WRITE", "DPRINT"]:
             if len(instruction.args) != 1:
                 stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
             if instruction.args[0].typ not in ["var", "int", "string", "bool", "nil"]:
-                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
+                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32)
         elif instruction.opcode == "EXIT":
             if len(instruction.args) != 1:
                 stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
             if instruction.args[0].typ != "int":
-                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
+                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32)
         elif instruction.opcode in ["ADD", "SUB", "MUL", "IDIV"]:
             if len(instruction.args) != 3:
                 stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
             if instruction.args[0].typ != "var":
-                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
+                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32)
             if instruction.args[1].typ not in ["var", "int"]:
                 stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
             if instruction.args[2].typ not in ["var", "int"]:
@@ -541,16 +694,16 @@ class Interpret:
             if len(instruction.args) != 3:
                 stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
             if instruction.args[0].typ != "var":
-                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
-            if instruction.args[1].typ not in ["var", "int", "string", "bool"]:
-                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
-            if instruction.args[2].typ not in ["var", "int", "string", "bool"]:
-                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
+                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32)
+            if instruction.args[1].typ not in ["var", "int", "string", "bool", "nil"]:
+                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32)
+            if instruction.args[2].typ not in ["var", "int", "string", "bool", "nil"]:
+                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32)
         elif instruction.opcode in ["AND", "OR"]:
             if len(instruction.args) != 3:
                 stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
             if instruction.args[0].typ != "var":
-                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
+                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32)
             if instruction.args[1].typ not in ["var", "bool"]:
                 stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
             if instruction.args[2].typ not in ["var", "bool"]:
@@ -559,72 +712,74 @@ class Interpret:
             if len(instruction.args) != 2:
                 stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
             if instruction.args[0].typ != "var":
-                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
+                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32)
             if instruction.args[1].typ not in ["var", "bool"]:
                 stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
         elif instruction.opcode == "INT2CHAR":
             if len(instruction.args) != 2:
                 stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
             if instruction.args[0].typ != "var":
-                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
+                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32)
             if instruction.args[1].typ not in ["var", "int"]:
-                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
+                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32)
         elif instruction.opcode in ["STRI2INT", "GETCHAR"]:
             if len(instruction.args) != 3:
                 stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
             if instruction.args[0].typ != "var":
-                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
+                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32)
             if instruction.args[1].typ not in ["var", "string"]:
-                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
+                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32)
             if instruction.args[2].typ not in ["var", "int"]:
-                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
+                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32)
         elif instruction.opcode == "STRLEN":
             if len(instruction.args) != 2:
                 stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
             if instruction.args[0].typ != "var":
-                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
+                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32)
             if instruction.args[1].typ not in ["var", "string"]:
-                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
+                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32)
         elif instruction.opcode == "READ":
             if len(instruction.args) != 2:
                 stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
             if instruction.args[0].typ != "var":
-                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
+                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32)
             if instruction.args[1].typ != "type":
                 stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32) # TODO: check if return codes are valid
         elif instruction.opcode == "SETCHAR":
             if len(instruction.args) != 3:
                 stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
             if instruction.args[0].typ != "var":
-                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
+                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32)
             if instruction.args[1].typ not in ["var", "int"]:
-                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
+                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32)
             if instruction.args[2].typ not in ["var", "string"]:
-                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
+                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32)
         elif instruction.opcode in ["JUMPIFEQ", "JUMPIFNEQ"]:
             if len(instruction.args) != 3:
                 stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
             if instruction.args[0].typ != "label":
-                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
+                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32)
             if instruction.args[1].typ not in ["var", "int", "string", "bool", "nil"]:
-                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
+                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32)
             if instruction.args[2].typ not in ["var", "int", "string", "bool", "nil"]:
-                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
+                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32)
         elif instruction.opcode == "CONCAT":
             if len(instruction.args) != 3:
                 stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
             if instruction.args[0].typ != "var":
-                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
+                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32)
             if instruction.args[1].typ not in ["var", "string"]:
-                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
+                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32)
             if instruction.args[2].typ not in ["var", "string"]:
-                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 53)
+                stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong argument type", 32)
 
     def parse_xml(self):
         for child in self.root:
             instruction = Instruction(child.attrib["opcode"].upper(), int(child.attrib["order"]))
             for arg in child:
-                instruction.add_arg(Argument(arg.attrib["type"], arg.text))
+                argg = Argument(arg.attrib["type"], str(arg.text).strip())
+                argg.convert_data()
+                instruction.add_arg(argg)
                 if int(arg.tag[3:]) > len(instruction.get_args()):
                     stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
             self.check_instruction_args(instruction)
