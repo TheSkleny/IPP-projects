@@ -1,7 +1,6 @@
 import re
 import sys
 import xml.etree.ElementTree as ET
-import fileinput
 
 
 def stderr_print(message, exit_code):
@@ -49,6 +48,8 @@ class Argument:
         elif self.typ == "type":
             self.data = self.data
         elif self.typ == "var":
+            self.data = self.data
+        elif self.typ == "label":
             self.data = self.data
         else:
             stderr_print("ERR: Invalid argument type", 32)
@@ -121,14 +122,22 @@ class Stack:
 class ExecuteProgram:
     def __init__(self, instructions, input_file):
         self.instructions = instructions
-        self.instruction_index = 0
+        self.instruction_pointer = 0
         self.instruction = None
         self._GF_frame = Frame()
         self._TF_frame = None  # it is defined only when it is created or poped
         self._labels = {}
         self._frames_stack = Stack()
         self._data_stack = Stack()
+        self._call_stack = Stack()
         self._input_file = input_file
+
+    def match_labels(self):
+        for i, instruction in enumerate(self.instructions):
+            if instruction.opcode == "LABEL":
+                if instruction.get_arg(0).get_data() in self._labels:
+                    stderr_print("ERR: Label already defined", 52)
+                self._labels[instruction.get_arg(0).get_data()] = i
 
     @staticmethod
     def _translate_string(string):
@@ -237,7 +246,8 @@ class ExecuteProgram:
             stderr_print("ERR: Invalid types for compare", 53)
     
     def execute(self):
-        for instr in self.instructions:
+        while self.instruction_pointer < len(self.instructions):
+            instr = self.instructions[self.instruction_pointer]
             match instr.opcode:
                 case "MOVE":
                     self.move(instr)
@@ -252,7 +262,7 @@ class ExecuteProgram:
                 case "CALL":
                     self.call(instr)
                 case "RETURN":
-                    self.return_(instr)
+                    self.return_()
                 case "PUSHS":
                     self.pushs(instr)
                 case "POPS":
@@ -311,6 +321,7 @@ class ExecuteProgram:
                     self.break_(instr)
                 case _:  # default
                     stderr_print("ERR: Invalid instruction", 32)
+            self.instruction_pointer += 1
 
     def move(self, instruction):
         var = self._get_var(instruction.get_arg(0).get_data())
@@ -376,10 +387,15 @@ class ExecuteProgram:
             stderr_print("ERR: Invalid variable name", 32)
 
     def call(self, instruction):
-        raise NotImplementedError
+        if instruction.get_arg(0).get_data() not in self._labels.keys():
+            stderr_print("ERR: Label not defined", 52)
+        self._call_stack.push(self.instruction_pointer)
+        self.instruction_pointer = self._labels[instruction.get_arg(0).get_data()]
 
-    def return_(self, instruction):
-        raise NotImplementedError
+    def return_(self):
+        if self._call_stack.is_empty():
+            stderr_print("ERR: No function to return", 56)
+        self.instruction_pointer = self._call_stack.pop()
 
     def pushs(self, instruction):
         raise NotImplementedError
@@ -589,16 +605,46 @@ class ExecuteProgram:
         var_set.set_type("string")
 
     def label(self, instruction):
-        raise NotImplementedError
+        pass
 
     def jump(self, instruction):
-        raise NotImplementedError
+        if instruction.get_arg(0).get_data() not in self._labels.keys():
+            stderr_print("ERR: Label not defined", 52)
+        self.instruction_pointer = self._labels[instruction.get_arg(0).get_data()]
 
     def jumpifeq(self, instruction):
-        raise NotImplementedError
+        if instruction.get_arg(0).get_data() not in self._labels.keys():
+            stderr_print("ERR: Label not defined", 52)
+        if instruction.get_arg(1).get_type() == "var":
+            var1 = self._get_var(instruction.get_arg(1).get_data())
+        else:
+            var1 = Variable("tmp", instruction.get_arg(1).get_type(), instruction.get_arg(1).get_data())
+        if instruction.get_arg(2).get_type() == "var":
+            var2 = self._get_var(instruction.get_arg(2).get_data())
+        else:
+            var2 = Variable("tmp", instruction.get_arg(2).get_type(), instruction.get_arg(2).get_data())
+        if var1.get_type() == var2.get_type() or var1.get_type() == "nil" or var2.get_type() == "nil":
+            if var1.get_value() == var2.get_value():
+                self.instruction_pointer = self._labels[instruction.get_arg(0).get_data()]
+        else:
+            stderr_print("ERR: Invalid type of variable", 53)
 
     def jumpifneq(self, instruction):
-        raise NotImplementedError
+        if instruction.get_arg(0).get_data() not in self._labels.keys():
+            stderr_print("ERR: Label not defined", 52)
+        if instruction.get_arg(1).get_type() == "var":
+            var1 = self._get_var(instruction.get_arg(1).get_data())
+        else:
+            var1 = Variable("tmp", instruction.get_arg(1).get_type(), instruction.get_arg(1).get_data())
+        if instruction.get_arg(2).get_type() == "var":
+            var2 = self._get_var(instruction.get_arg(2).get_data())
+        else:
+            var2 = Variable("tmp", instruction.get_arg(2).get_type(), instruction.get_arg(2).get_data())
+        if var1.get_type() == var2.get_type() or var1.get_type() == "nil" or var2.get_type() == "nil":
+            if var1.get_value() != var2.get_value():
+                self.instruction_pointer = self._labels[instruction.get_arg(0).get_data()]
+        else:
+            stderr_print("ERR: Invalid type of variable", 53)
 
     def exit(self, instruction):
         if instruction.get_arg(0).get_type() == "var":
@@ -647,6 +693,7 @@ class Interpret:
         self.check_xml()
         self.parse_xml()
         execute = ExecuteProgram(self.instruction_list, self.input_file)
+        execute.match_labels()
         execute.execute()
 
     def read_files(self):
@@ -760,7 +807,8 @@ class Interpret:
                     if arg.text != "nil":
                         stderr_print("ERR: Invalid XML, nil is not valid", 32)
 
-    def check_instruction_args(self, instruction):
+    @staticmethod
+    def check_instruction_args(instruction):
         if instruction.opcode in ["MOVE", "TYPE"]:
             if len(instruction.args) != 2:
                 stderr_print(f"ERR: Invalid XML, instruction {instruction.opcode} has wrong number of arguments", 32)
