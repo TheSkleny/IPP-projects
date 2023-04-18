@@ -87,7 +87,13 @@ class Frame:
         self.variables[variable.get_name()] = variable
 
     def get_variable(self, name):  # returns Variable object
-        return self.variables[name]
+        try:
+            return self.variables[name]
+        except KeyError:
+            return None
+
+    def get_variables(self):
+        return self.variables
 
 
 class Stack:
@@ -98,8 +104,19 @@ class Stack:
         self.stack.append(item)
 
     def pop(self):
-        return self.stack.pop()
+        try:
+            return self.stack.pop()
+        except IndexError:
+            return None
 
+    def top(self):
+        try:
+            return self.stack[-1]
+        except IndexError:
+            return None
+
+    def is_empty(self):
+        return not self.stack
 
 class ExecuteProgram:
     def __init__(self, instructions, input_file):
@@ -107,7 +124,6 @@ class ExecuteProgram:
         self.instruction_index = 0
         self.instruction = None
         self._GF_frame = Frame()
-        self._LF_frame = None  # it is defined only when it is needed
         self._TF_frame = None  # it is defined only when it is created or poped
         self._labels = {}
         self._frames_stack = Stack()
@@ -123,12 +139,18 @@ class ExecuteProgram:
             return self._GF_frame.get_variable(name)
         elif name[0] == "L":
             try:
-                return self._LF_frame.get_variable(name)
+                if self._frames_stack.top().get_variable(name) is not None:
+                    return self._frames_stack.top().get_variable(name)
+                else:
+                    stderr_print("ERR: Variable not defined in Local frame", 54)
             except AttributeError:
                 stderr_print("ERR: Local frame not defined", 55)
         elif name[0] == "T":
             try:
-                return self._TF_frame.get_variable(name)
+                if self._TF_frame.get_variable(name) is not None:
+                    return self._TF_frame.get_variable(name)
+                else:
+                    stderr_print("ERR: Variable not defined in Temporary frame", 54)
             except AttributeError:
                 stderr_print("ERR: Temporary frame not defined", 55)
         else:
@@ -220,11 +242,11 @@ class ExecuteProgram:
                 case "MOVE":
                     self.move(instr)
                 case "CREATEFRAME":
-                    self.create_frame(instr)
+                    self.create_frame()
                 case "PUSHFRAME":
-                    self.push_frame(instr)
+                    self.push_frame()
                 case "POPFRAME":
-                    self.pop_frame(instr)
+                    self.pop_frame()
                 case "DEFVAR":
                     self.def_var(instr)
                 case "CALL":
@@ -299,27 +321,55 @@ class ExecuteProgram:
             var.set_value(instruction.get_arg(1).get_data())
             var.set_type(instruction.get_arg(1).get_type())
 
-    def create_frame(self, instruction):
-        raise NotImplementedError
+    def create_frame(self):
+        self._TF_frame = Frame()
 
-    def push_frame(self, instruction):
-        raise NotImplementedError
+    def push_frame(self):
+        if self._TF_frame is None:
+            stderr_print("ERR: Temporary frame not defined", 55)
+        temp_frame = Frame()
+        for var, name in enumerate(self._TF_frame.get_variables().keys()):
+            new_name = "LF@" + name.split("@")[1]
+            refactored_var = Variable(new_name, self._TF_frame.get_variable(name).get_type(), self._TF_frame.get_variable(name).get_value())
+            temp_frame.add_variable(refactored_var)
+        self._frames_stack.push(temp_frame)
+        self._TF_frame = None
 
-    def pop_frame(self, instruction):
-        raise NotImplementedError
+    def pop_frame(self):
+        if self._frames_stack.is_empty():
+            stderr_print("ERR: No frame to pop", 55)
+        temp_frame = Frame()
+        for var, name in enumerate(self._frames_stack.top().get_variables().keys()):
+            new_name = "TF@" + name.split("@")[1]
+            refactored_var = Variable(new_name, self._frames_stack.top().get_variable(name).get_type(),
+                                      self._frames_stack.top().get_variable(name).get_value())
+            temp_frame.add_variable(refactored_var)
+        self._frames_stack.pop()
+        self._TF_frame = temp_frame
 
     def def_var(self, instruction):
         var = instruction.get_arg(0).get_data()
         if var[0] == "G":
-            self._GF_frame.add_variable(Variable(var, None, None))
+            if self._GF_frame.get_variable(var) is None:
+                self._GF_frame.add_variable(Variable(var, None, None))
+            else:
+                stderr_print("ERR: Variable already definedin GF", 52)
         elif var[0] == "L":
             try:
-                self._LF_frame.add_variable(Variable(var, None, None))
+                if self._frames_stack.is_empty():
+                    stderr_print("ERR: Local frame does not exists", 55)
+                if self._frames_stack.top().get_variable(var) is None:
+                    self._frames_stack.top().add_variable(Variable(var, None, None))
+                else:
+                    stderr_print("ERR: Variable already defined in LF", 52)
             except AttributeError:
                 stderr_print("ERR: Local frame not defined", 55)
         elif var[0] == "T":
             try:
-                self._TF_frame.add_variable(Variable(var, None, None))
+                if self._TF_frame.get_variable(var) is None:
+                    self._TF_frame.add_variable(Variable(var, None, None))
+                else:
+                    stderr_print("ERR: Variable already defined in TF", 52)
             except AttributeError:
                 stderr_print("ERR: Temporary frame not defined", 55)
         else:
