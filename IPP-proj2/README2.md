@@ -212,6 +212,7 @@ __Methods:__
 - push(var) - adds Variable object to the stack
 - pop() - returns the Variable object from the top of the stack
 - top() - returns the Variable object from the top of the stack without removing it
+<<<<<<< HEAD
 - is_empty() - returns True if the stack is empty, False otherwise
 
 
