@@ -648,7 +648,7 @@ class ExecuteProgram:
         else:
             var = Variable("tmp", instruction.get_arg(1).get_type(), instruction.get_arg(1).get_data())
         if var.get_type() == "string":
-            var_set.set_value(len(var.get_value()))
+            var_set.set_value(len(self._translate_string(var.get_value())))
             var_set.set_type("int")
         else:
             stderr_print("ERR: Invalid type of variable", 53)
