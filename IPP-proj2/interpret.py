@@ -119,6 +119,7 @@ class Stack:
     def is_empty(self):
         return not self.stack
 
+
 class ExecuteProgram:
     def __init__(self, instructions, input_file):
         self.instructions = instructions
@@ -398,10 +399,19 @@ class ExecuteProgram:
         self.instruction_pointer = self._call_stack.pop()
 
     def pushs(self, instruction):
-        raise NotImplementedError
+        if instruction.get_arg(0).get_type() == "var":
+            self._data_stack.push([self._get_var(instruction.get_arg(0).get_data()).get_value(),
+                                  self._get_var(instruction.get_arg(0).get_data()).get_type()])
+        else:
+            self._data_stack.push([instruction.get_arg(0).get_data(), instruction.get_arg(0).get_type()])
 
     def pops(self, instruction):
-        raise NotImplementedError
+        var = self._get_var(instruction.get_arg(0).get_data())
+        if self._data_stack.is_empty():
+            stderr_print("ERR: Data stack is empty", 56)
+        var.set_value(self._data_stack.top()[0])
+        var.set_type(self._data_stack.top()[1])
+        self._data_stack.pop()
 
     def add(self, instruction):
         self._arithmetic(instruction, "add")
@@ -798,7 +808,7 @@ class Interpret:
                     if not re.match(r'^[-+]?[0-9]+$', str(arg.text).strip()):
                         stderr_print("ERR: Invalid XML, int is not valid", 32)
                 if arg.attrib["type"] == "string":
-                    if not re.match(r'^[^\s#\\\\]|(\\[0-9]{3})*$', "" if arg.text is None else str(arg.text).strip()):
+                    if not re.match(r'^(?:(?!\\|#|\s).|\\[0-9]{3})*$', str(arg.text)):
                         stderr_print("ERR: Invalid XML, string is not valid", 32)
                 if arg.attrib["type"] == "bool":
                     if str(arg.text).strip() != "true" and str(arg.text).strip() != "false":
@@ -935,7 +945,7 @@ class Interpret:
         for child in self.root:
             instruction = Instruction(child.attrib["opcode"].upper(), int(child.attrib["order"]))
             for arg in child:
-                argg = Argument(arg.attrib["type"], str(arg.text).strip())
+                argg = Argument(arg.attrib["type"], str(arg.text).strip() if arg.text is not None else "")
                 argg.convert_data()
                 instruction.add_arg(argg)
                 if int(arg.tag[3:]) > len(instruction.get_args()):
