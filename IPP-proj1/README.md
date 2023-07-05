@@ -17,4 +17,4 @@ In case of wrong input, program ends with appropriate exit code and error messag
 ## Program
 Program is separated into functions. Validate functions are used for regex matching of input, if
 instructions and its parameters are correct. Generate functions are basically used for xml generation.
-Main function contains switch. Overall this program only parses input in pseudo-assembly to XML format, that is later processed by secont part of this project (interpreter.py)
+Main function contains switch. Overall this program only parses input in pseudo-assembly to XML format, that is later processed by second part of this project (interpreter.py)
